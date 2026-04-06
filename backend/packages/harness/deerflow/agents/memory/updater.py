@@ -8,6 +8,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
+from deerflow.agents.memory.layers import classify_fact_layer, ensure_layer_index
 from deerflow.agents.memory.prompt import (
     MEMORY_UPDATE_PROMPT,
     format_conversation_for_update,
@@ -63,7 +64,7 @@ def clear_memory_data(agent_name: str | None = None) -> dict[str, Any]:
     cleared_memory = create_empty_memory()
     if not _save_memory_to_file(cleared_memory, agent_name):
         raise OSError("Failed to save cleared memory data")
-    return cleared_memory
+    return ensure_layer_index(cleared_memory)
 
 
 def _validate_confidence(confidence: float) -> float:
@@ -98,6 +99,7 @@ def create_memory_fact(
             "confidence": validated_confidence,
             "createdAt": now,
             "source": "manual",
+            "layer": classify_fact_layer({"content": normalized_content, "category": normalized_category}),
         }
     )
     updated_memory["facts"] = facts
@@ -105,7 +107,7 @@ def create_memory_fact(
     if not _save_memory_to_file(updated_memory, agent_name):
         raise OSError("Failed to save memory data after creating fact")
 
-    return updated_memory
+    return ensure_layer_index(updated_memory)
 
 
 def delete_memory_fact(fact_id: str, agent_name: str | None = None) -> dict[str, Any]:
@@ -122,7 +124,7 @@ def delete_memory_fact(fact_id: str, agent_name: str | None = None) -> dict[str,
     if not _save_memory_to_file(updated_memory, agent_name):
         raise OSError(f"Failed to save memory data after deleting fact '{fact_id}'")
 
-    return updated_memory
+    return ensure_layer_index(updated_memory)
 
 
 def update_memory_fact(
@@ -151,6 +153,7 @@ def update_memory_fact(
                 updated_fact["category"] = category.strip() or "context"
             if confidence is not None:
                 updated_fact["confidence"] = _validate_confidence(confidence)
+            updated_fact["layer"] = classify_fact_layer(updated_fact)
             updated_facts.append(updated_fact)
         else:
             updated_facts.append(fact)
@@ -163,7 +166,7 @@ def update_memory_fact(
     if not _save_memory_to_file(updated_memory, agent_name):
         raise OSError(f"Failed to save memory data after updating fact '{fact_id}'")
 
-    return updated_memory
+    return ensure_layer_index(updated_memory)
 
 
 def _extract_text(content: Any) -> str:
@@ -237,6 +240,7 @@ def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str,
     if facts:
         memory_data["facts"] = [f for f in facts if not _UPLOAD_SENTENCE_RE.search(f.get("content", ""))]
 
+    ensure_layer_index(memory_data)
     return memory_data
 
 
@@ -350,7 +354,7 @@ class MemoryUpdater:
             updated_memory = _strip_upload_mentions_from_memory(updated_memory)
 
             # Save
-            return get_memory_storage().save(updated_memory, agent_name)
+            return _save_memory_to_file(updated_memory, agent_name)
 
         except json.JSONDecodeError as e:
             logger.warning("Failed to parse LLM response for memory update: %s", e)
@@ -377,6 +381,7 @@ class MemoryUpdater:
         """
         config = get_memory_config()
         now = datetime.utcnow().isoformat() + "Z"
+        current_memory = ensure_layer_index(current_memory)
 
         # Update user sections
         user_updates = update_data.get("user", {})
@@ -417,6 +422,7 @@ class MemoryUpdater:
                 if fact_key is not None and fact_key in existing_fact_keys:
                     continue
 
+                layer_name = classify_fact_layer(fact)
                 fact_entry = {
                     "id": f"fact_{uuid.uuid4().hex[:8]}",
                     "content": normalized_content,
@@ -424,6 +430,7 @@ class MemoryUpdater:
                     "confidence": confidence,
                     "createdAt": now,
                     "source": thread_id or "unknown",
+                    "layer": layer_name,
                 }
                 source_error = fact.get("sourceError")
                 if isinstance(source_error, str):
@@ -443,6 +450,7 @@ class MemoryUpdater:
                 reverse=True,
             )[: config.max_facts]
 
+        ensure_layer_index(current_memory)
         return current_memory
 
 
