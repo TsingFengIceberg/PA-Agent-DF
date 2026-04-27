@@ -4,7 +4,8 @@ from io import BytesIO
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from fastapi import UploadFile
+import pytest
+from fastapi import HTTPException, UploadFile
 
 from app.gateway.routers import uploads
 
@@ -248,6 +249,29 @@ def test_delete_uploaded_file_removes_generated_markdown_companion(tmp_path):
     assert result == {"success": True, "message": "Deleted report.pdf"}
     assert not (thread_uploads_dir / "report.pdf").exists()
     assert not (thread_uploads_dir / "report.md").exists()
+
+
+def test_upload_files_rejects_legacy_doc_without_supported_converter_when_conversion_enabled(tmp_path):
+    thread_uploads_dir = tmp_path / "uploads"
+    thread_uploads_dir.mkdir(parents=True)
+
+    provider = MagicMock()
+    provider.acquire.return_value = "local"
+    provider.get.return_value = MagicMock()
+
+    with (
+        patch.object(uploads, "ensure_uploads_dir", return_value=thread_uploads_dir),
+        patch.object(uploads, "get_sandbox_provider", return_value=provider),
+        patch.object(uploads, "_auto_convert_documents_enabled", return_value=True),
+        patch.object(
+            uploads,
+            "ensure_legacy_doc_conversion_supported",
+            side_effect=uploads.LegacyDocConversionError("Legacy .doc uploads require LibreOffice (`soffice`) or macOS `textutil` to convert them to .docx before Markdown extraction."),
+        ),
+    ):
+        file = UploadFile(filename="legacy.doc", file=BytesIO(b"doc-bytes"))
+        with pytest.raises(HTTPException, match="Legacy \\.doc uploads require LibreOffice"):
+            asyncio.run(uploads.upload_files("thread-local", files=[file]))
 
 
 def test_auto_convert_documents_enabled_defaults_to_false_on_config_errors():
