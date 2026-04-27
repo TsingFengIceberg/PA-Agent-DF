@@ -80,6 +80,48 @@ export default function ChatPage() {
     },
     [sendMessage, threadId],
   );
+
+  const handleClarificationSubmit = useCallback(
+    (response: ClarificationResponse) => {
+      const lines: string[] = [];
+      if (response.title) {
+        lines.push(`[Clarification] ${response.title}`);
+      }
+
+      if (response.mode === "single") {
+        const answer = response.answers[0];
+        const value = Array.isArray(answer.answer)
+          ? answer.answer.join(", ")
+          : answer.answer;
+        const textValue = typeof value === "string" ? value.trim() : "";
+        if (textValue) {
+          lines.push(`1. ${answer.question}: ${textValue}`);
+        }
+      } else if (response.mode === "form") {
+        response.answers.forEach((answer, index) => {
+          const value = Array.isArray(answer.answer)
+            ? answer.answer.join(", ")
+            : answer.answer;
+          const textValue = typeof value === "string" ? value.trim() : "";
+          if (textValue) {
+            lines.push(`${index + 1}. ${answer.question}: ${textValue}`);
+          }
+        });
+      }
+
+      const text = lines.join("\n");
+      if (!text) {
+        return;
+      }
+
+      void sendMessage(threadId, {
+        text,
+        files: [],
+      });
+    },
+    [sendMessage, threadId],
+  );
+
   const handleStop = useCallback(async () => {
     await thread.stop();
   }, [thread]);
@@ -121,6 +163,7 @@ export default function ChatPage() {
                 thread={thread}
                 paddingBottom={messageListPaddingBottom}
                 tokenUsageEnabled={tokenUsageEnabled}
+                onSubmitClarification={handleClarificationSubmit}
               />
             </div>
             <div className="absolute right-0 bottom-0 left-0 z-30 flex justify-center px-4">
