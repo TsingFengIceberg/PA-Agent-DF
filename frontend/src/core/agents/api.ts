@@ -8,11 +8,23 @@ const BACKEND_UNAVAILABLE_STATUSES = new Set([502, 503, 504]);
 export class AgentNameCheckError extends Error {
   constructor(
     message: string,
-    public readonly reason: "backend_unreachable" | "request_failed",
+    public readonly reason:
+      | "backend_unreachable"
+      | "api_disabled"
+      | "request_failed",
   ) {
     super(message);
     this.name = "AgentNameCheckError";
   }
+}
+
+export function isAgentsApiDisabledError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /agents_api\.enabled=true|Custom-agent management API is disabled/i.test(
+      error.message,
+    )
+  );
 }
 
 export async function listAgents(): Promise<Agent[]> {
@@ -81,6 +93,8 @@ export async function checkAgentName(
 
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { detail?: string };
+    const message =
+      err.detail ?? `Failed to check agent name: ${res.statusText}`;
     if (BACKEND_UNAVAILABLE_STATUSES.has(res.status)) {
       throw new AgentNameCheckError(
         "Could not reach the DeerFlow backend.",
@@ -88,8 +102,10 @@ export async function checkAgentName(
       );
     }
     throw new AgentNameCheckError(
-      err.detail ?? `Failed to check agent name: ${res.statusText}`,
-      "request_failed",
+      message,
+      res.status === 403 && isAgentsApiDisabledError(new Error(message))
+        ? "api_disabled"
+        : "request_failed",
     );
   }
   return res.json() as Promise<{ available: boolean; name: string }>;
