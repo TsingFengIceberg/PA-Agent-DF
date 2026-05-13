@@ -50,7 +50,7 @@ def _middleware(
     preserve_recent_skill_tokens_per_skill: int = 0,
 ) -> DeerFlowSummarizationMiddleware:
     model = MagicMock()
-    model.invoke.return_value = SimpleNamespace(text="compressed summary")
+    model.invoke.return_value = AIMessage(content="compressed summary")
     return DeerFlowSummarizationMiddleware(
         model=model,
         trigger=trigger,
@@ -634,3 +634,62 @@ def test_memory_flush_hook_preserves_agent_scoped_memory(monkeypatch: pytest.Mon
 
     queue.add_nowait.assert_called_once()
     assert queue.add_nowait.call_args.kwargs["agent_name"] == "research-agent"
+
+
+# ---------------------------------------------------------------------------
+# Issue #2804: summary text must not leak to the frontend via streaming
+# ---------------------------------------------------------------------------
+
+
+def test_build_new_messages_sets_hide_from_ui() -> None:
+    """The summary HumanMessage must carry hide_from_ui so the frontend filters it."""
+    middleware = _middleware()
+    messages = middleware._build_new_messages("test summary")
+
+    assert len(messages) == 1
+    msg = messages[0]
+    assert msg.name == "summary"
+    assert msg.additional_kwargs.get("hide_from_ui") is True
+    assert "test summary" in msg.content
+
+
+def test_create_summary_suppresses_callbacks() -> None:
+    """_create_summary must pass callbacks=[] to prevent the internal LLM call
+    from producing visible streaming events in the frontend (issue #2804)."""
+    middleware = _middleware()
+
+    middleware._create_summary(_messages())
+
+    middleware.model.invoke.assert_called_once()
+    call_config = middleware.model.invoke.call_args.kwargs.get("config") or middleware.model.invoke.call_args[1].get("config")
+    assert call_config is not None
+    assert call_config.get("callbacks") == []
+    assert call_config.get("metadata", {}).get("lc_source") == "summarization"
+
+
+@pytest.mark.anyio
+async def test_acreate_summary_suppresses_callbacks() -> None:
+    """_acreate_summary must pass callbacks=[] to prevent the internal LLM call
+    from producing visible streaming events in the frontend (issue #2804)."""
+    middleware = _middleware()
+    middleware.model.ainvoke = mock.AsyncMock(return_value=AIMessage(content="async summary"))
+
+    await middleware._acreate_summary(_messages())
+
+    middleware.model.ainvoke.assert_called_once()
+    call_config = middleware.model.ainvoke.call_args.kwargs.get("config") or middleware.model.ainvoke.call_args[1].get("config")
+    assert call_config is not None
+    assert call_config.get("callbacks") == []
+    assert call_config.get("metadata", {}).get("lc_source") == "summarization"
+
+
+def test_before_model_summary_message_has_hide_from_ui() -> None:
+    """End-to-end: the emitted state update contains a summary message with hide_from_ui."""
+    middleware = _middleware()
+
+    result = middleware.before_model({"messages": _messages()}, _runtime())
+
+    emitted = result["messages"]
+    summary_msg = emitted[1]
+    assert summary_msg.name == "summary"
+    assert summary_msg.additional_kwargs.get("hide_from_ui") is True
