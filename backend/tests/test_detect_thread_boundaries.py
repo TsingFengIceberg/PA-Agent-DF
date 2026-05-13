@@ -1,0 +1,135 @@
+from __future__ import annotations
+
+import importlib.util
+import json
+import sys
+import textwrap
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DETECTOR_SCRIPT_PATH = REPO_ROOT / "scripts" / "detect_thread_boundaries.py"
+
+spec = importlib.util.spec_from_file_location("deerflow_detect_thread_boundaries", DETECTOR_SCRIPT_PATH)
+assert spec is not None
+assert spec.loader is not None
+detector = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = detector
+spec.loader.exec_module(detector)
+
+
+def _write_python(path: Path, source: str) -> Path:
+    path.write_text(textwrap.dedent(source).strip() + "\n", encoding="utf-8")
+    return path
+
+
+def test_scan_file_detects_async_thread_and_tool_boundaries(tmp_path):
+    source_file = _write_python(
+        tmp_path / "sample.py",
+        """
+        import asyncio
+        import threading
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+        from langchain.tools import tool
+        from langchain_core.tools import StructuredTool
+
+        @tool
+        async def async_tool(value: int) -> str:
+            return str(value)
+
+        async def handler(model):
+            await asyncio.to_thread(str, "x")
+            model.invoke("blocking")
+            time.sleep(1)
+
+        def sync_entry():
+            asyncio.run(handler(None))
+            pool = ThreadPoolExecutor(max_workers=1)
+            pool.submit(str, "x")
+            threading.Thread(target=sync_entry).start()
+            return StructuredTool.from_function(
+                name="factory_tool",
+                description="factory",
+                coroutine=async_tool,
+            )
+        """,
+    )
+
+    findings = detector.scan_file(source_file, repo_root=tmp_path)
+    categories = {finding.category for finding in findings}
+    async_tool_finding = next(finding for finding in findings if finding.category == "ASYNC_TOOL_DEFINITION")
+
+    assert "ASYNC_TOOL_DEFINITION" in categories
+    assert async_tool_finding.function == "async_tool"
+    assert async_tool_finding.async_context is True
+    assert "ASYNC_THREAD_OFFLOAD" in categories
+    assert "SYNC_INVOKE_IN_ASYNC" in categories
+    assert "BLOCKING_CALL_IN_ASYNC" in categories
+    assert "SYNC_ASYNC_BRIDGE" in categories
+    assert "THREAD_POOL" in categories
+    assert "EXECUTOR_SUBMIT" in categories
+    assert "RAW_THREAD" in categories
+    assert "ASYNC_ONLY_TOOL_FACTORY" in categories
+
+
+def test_scan_paths_ignores_virtualenv_like_directories(tmp_path):
+    scanned_file = _write_python(
+        tmp_path / "app.py",
+        """
+        import asyncio
+
+        def main():
+            return asyncio.run(asyncio.sleep(0))
+        """,
+    )
+    ignored_dir = tmp_path / ".venv"
+    ignored_dir.mkdir()
+    _write_python(
+        ignored_dir / "ignored.py",
+        """
+        import threading
+
+        thread = threading.Thread(target=lambda: None)
+        """,
+    )
+
+    findings = detector.scan_paths([tmp_path], repo_root=tmp_path)
+
+    assert any(finding.path == scanned_file.name for finding in findings)
+    assert all(".venv" not in finding.path for finding in findings)
+
+
+def test_json_output_and_min_severity_filter(tmp_path, capsys):
+    source_file = _write_python(
+        tmp_path / "sample.py",
+        """
+        import asyncio
+
+        async def handler(model):
+            await asyncio.to_thread(str, "x")
+            model.invoke("blocking")
+        """,
+    )
+
+    exit_code = detector.main(["--format", "json", "--min-severity", "WARN", str(source_file)])
+
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    categories = {finding["category"] for finding in payload}
+    assert categories == {"SYNC_INVOKE_IN_ASYNC"}
+
+
+def test_parse_errors_are_reported_as_findings(tmp_path):
+    source_file = _write_python(
+        tmp_path / "broken.py",
+        """
+        def broken(:
+            pass
+        """,
+    )
+
+    findings = detector.scan_file(source_file, repo_root=tmp_path)
+
+    assert len(findings) == 1
+    assert findings[0].category == "PARSE_ERROR"
+    assert findings[0].severity == "WARN"
