@@ -1005,6 +1005,8 @@ Analysis SubGraph 输出 SynthesisReport
       ├── 修改 → Command(resume={"action": "modify", "changes": {...}}) → Analysis SubGraph
       └── 重来 → Command(resume={"action": "replan"}) → Research SubGraph
 
+```
+
 ---
 
 ## 5. LangGraph 工作流编排设计：Nested SubGraph + 角色门控
