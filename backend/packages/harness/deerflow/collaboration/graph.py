@@ -29,6 +29,7 @@ from langgraph.constants import END
 from langgraph.graph import StateGraph
 
 from deerflow.collaboration.nodes.analysis_nodes import report_composer_node
+from deerflow.collaboration.nodes.hitl_gate import hitl_gate_node
 from deerflow.collaboration.state import CollaborationState
 from deerflow.collaboration.subgraphs.analysis_subgraph import build_analysis_subgraph
 from deerflow.collaboration.subgraphs.research_subgraph import build_research_subgraph
@@ -46,17 +47,6 @@ logger = logging.getLogger(__name__)
 
 
 # ── Parent 层节点 ──
-
-
-def hitl_gate_node(state: CollaborationState) -> dict:
-    """HITL Gate — 人类审批门。
-
-    LangGraph 2.0 interrupt() 实现，在 Analysis 完成后暂停，
-    等待人类审批（approve / modify / replan）。
-
-    Sprint 4 实现：interrupt() + Command(resume=data) 恢复。
-    """
-    raise NotImplementedError("hitl_gate_node — Sprint 4 实现")
 
 
 def error_handler_node(state: CollaborationState) -> dict:

@@ -10,30 +10,38 @@
 | 02 | SubGraph 构建与编译隔离 | [`02-subgraph-design.md`](02-subgraph-design.md) | 2026-05-14 (10 Q&A) |
 | 03 | Parent Graph 组装与条件路由 | [`03-graph-orchestration.md`](03-graph-orchestration.md) | 2026-05-14 (4 Q&A) |
 | 04 | 测试模式与断言 | [`04-testing-patterns.md`](04-testing-patterns.md) | 2026-05-14 (3 Q&A) |
-| 05 | 角色体系与权限门控 | *(待编码)* | — |
-| 06 | 对抗式批判协议 | [`05-debate-protocol.md`](05-debate-protocol.md) | 2026-05-14 (3 Q&A) |
-| 07 | 执行实例走读：Research 全链路 | [`06-execution-walkthrough.md`](06-execution-walkthrough.md) | 2026-05-14 |
-| 08 | Analysis SubGraph：节点流转与分析 Prompt | [`07-analysis-subgraph.md`](07-analysis-subgraph.md) | 2026-05-14 (2 Q&A) |
-| 07 | HITL 人类审批门 | *(待编码)* | — |
-| 08 | 配置与集成 | *(待编码)* | — |
+| 05 | 对抗式批判协议：Challenge/Rebuttal/Ruling | [`05-debate-protocol.md`](05-debate-protocol.md) | 2026-05-14 (3 Q&A) |
+| 06 | 执行实例走读：Research 全链路 | [`06-execution-walkthrough.md`](06-execution-walkthrough.md) | 2026-05-14 |
+| 07 | Analysis SubGraph：节点流转与分析 Prompt | [`07-analysis-subgraph.md`](07-analysis-subgraph.md) | 2026-05-14 (2 Q&A) |
+| 08 | 角色权限体系：Action 映射 + PermissionGuard | [`08-permission-system.md`](08-permission-system.md) | 2026-05-15 (8 Q&A) |
+| 09 | HITL 审批门：interrupt() + Checkpoint 暂停/恢复 | [`09-hitl-gate.md`](09-hitl-gate.md) | 2026-05-15 (1 Q&A) |
+| 10 | 流式事件系统：EventType + SSE 推送链路 | [`10-events-streaming.md`](10-events-streaming.md) | 2026-05-15 (2 Q&A) |
+| 11 | 协作系统整体层级调用图 | [`11-architecture-hierarchy.md`](11-architecture-hierarchy.md) | 2026-05-15 (1 Q&A) |
 
 ## 关联源文件索引
 
 | 源文件 | 相关学习文档 |
 |--------|-------------|
-| `backend/packages/harness/deerflow/collaboration/state.py` | 01 |
-| `backend/packages/harness/deerflow/collaboration/subgraphs/state_mapping.py` | 01 |
-| `backend/packages/harness/deerflow/collaboration/subgraphs/research_subgraph.py` | 02 |
-| `backend/packages/harness/deerflow/collaboration/subgraphs/analysis_subgraph.py` | 02 |
-| `backend/packages/harness/deerflow/collaboration/graph.py` | 03 |
-| `backend/packages/harness/deerflow/agents/thread_state.py` | 01 |
-| `backend/tests/test_collaboration_subgraphs.py` | 04 |
-| `backend/tests/test_collaboration_graph.py` | 04 |
-| `backend/tests/test_collaboration_debate.py` | 05 |
-| `backend/tests/test_collaboration_nodes.py` | 02 |
-| `backend/packages/harness/deerflow/collaboration/protocols/messages.py` | 05, 06 |
-| `backend/packages/harness/deerflow/collaboration/protocols/debate.py` | 05, 06 |
-| `backend/packages/harness/deerflow/collaboration/prompts/research_prompts.py` | 05, 06 |
-| `backend/packages/harness/deerflow/collaboration/nodes/research_nodes.py` | 02, 06 |
-| `backend/packages/harness/deerflow/collaboration/nodes/analysis_nodes.py` | 07 |
-| `backend/packages/harness/deerflow/collaboration/prompts/analysis_prompts.py` | 07 |
+| `collaboration/state.py` | 01, 11 |
+| `collaboration/subgraphs/state_mapping.py` | 01, 11 |
+| `collaboration/subgraphs/research_subgraph.py` | 02, 05, 11 |
+| `collaboration/subgraphs/analysis_subgraph.py` | 02, 07, 11 |
+| `collaboration/graph.py` | 03, 11 |
+| `collaboration/nodes/research_nodes.py` | 02, 06 |
+| `collaboration/nodes/analysis_nodes.py` | 07 |
+| `collaboration/nodes/hitl_gate.py` | 09 |
+| `collaboration/prompts/research_prompts.py` | 05, 06 |
+| `collaboration/prompts/analysis_prompts.py` | 07 |
+| `collaboration/protocols/messages.py` | 05, 06 |
+| `collaboration/protocols/debate.py` | 05, 06 |
+| `collaboration/permissions/role_definition.py` | 08 |
+| `collaboration/permissions/permission_guard.py` | 08 |
+| `collaboration/events.py` | 10 |
+| `agents/thread_state.py` | 01 |
+| `runtime/stream_bridge/base.py` | 10 |
+| `runtime/runs/worker.py` | 10 |
+| `tests/test_collaboration_subgraphs.py` | 04 |
+| `tests/test_collaboration_graph.py` | 04 |
+| `tests/test_collaboration_debate.py` | 04 |
+| `tests/test_collaboration_nodes.py` | 02, 04 |
+| `tests/test_collaboration_analysis.py` | 04, 07 |

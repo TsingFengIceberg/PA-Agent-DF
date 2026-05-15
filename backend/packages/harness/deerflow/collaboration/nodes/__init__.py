@@ -2,7 +2,7 @@
 
 Research SubGraph nodes (6): PI, Data Scout, Critic, Meta-Judge, PI Review, Error Handler
 Analysis SubGraph nodes (3): Analyst Lead, Synthesizer, Internal Reviewer
-Parent Graph nodes (2): HITL Gate (Sprint 4), Report Composer, Error Handler (Sprint 4)
+Parent Graph nodes (3): HITL Gate, Report Composer, Error Handler
 """
 
 from deerflow.collaboration.nodes.analysis_nodes import (
@@ -11,6 +11,7 @@ from deerflow.collaboration.nodes.analysis_nodes import (
     report_composer_node,
     synthesizer_node,
 )
+from deerflow.collaboration.nodes.hitl_gate import hitl_gate_node
 from deerflow.collaboration.nodes.research_nodes import (
     critic_agent_node,
     data_scout_node,
@@ -33,5 +34,6 @@ __all__ = [
     "synthesizer_node",
     "internal_reviewer_node",
     # Parent
+    "hitl_gate_node",
     "report_composer_node",
 ]
