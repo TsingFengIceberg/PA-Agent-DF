@@ -1,6 +1,6 @@
 # PA-Agent-DF 商品协同分析系统 — 架构与需求文档
 
-> **版本**: v2.0 | **日期**: 2026-05-14 | **阶段**: Phase 1 架构设计输出（修订版）
+> **版本**: v2.1 | **日期**: 2026-05-15 | **阶段**: Phase 3 完成，Phase 4 待实施
 
 ---
 
@@ -1994,114 +1994,88 @@ collaboration:
 - [x] 重写 CLAUDE.md：固化业务逻辑、协作流程、目录结构、技术选型
 - [x] 将架构文档核心约束写入 CLAUDE.md
 
-### Phase 3: 编码实施 (6 个 Sprint)
+### Phase 3: 编码实施 (6 个 Sprint — ✅ 全部完成)
 
-#### Sprint 1: SubGraph 骨架 + State 定义 (Week 1)
+> 2026-05-15: 6 个 Sprint 全部完成。180 个测试通过。详见 CLAUDE.md Section 9。
 
-| 文件 | 说明 |
-|------|------|
-| `collaboration/state.py` | 三层 State 定义 (ParentState + ResearchSubGraphState + AnalysisSubGraphState) |
-| `collaboration/subgraphs/research_subgraph.py` | Research SubGraph 骨架 (PI → Scouts → Critic → Judge → PI) |
-| `collaboration/subgraphs/analysis_subgraph.py` | Analysis SubGraph 骨架 (Lead → Synthesizer → Reviewer) |
-| `collaboration/subgraphs/state_mapping.py` | State Mapping 函数 (4 个纯函数) |
-| `collaboration/graph.py` | Parent Graph 组装 (挂载两个 SubGraph + state_in/out) |
-| `collaboration/router.py` | 条件路由函数 (含 SubGraph 错误上浮路由) |
-| `tests/test_collaboration_graph.py` | Parent Graph 可编译 + SubGraph 挂载验证 |
-| `tests/test_collaboration_subgraphs.py` | SubGraph 可独立编译 + State Mapping 正确性 |
+| Sprint | 内容 | 核心交付 | 差异说明 |
+|--------|------|---------|---------|
+| 1 | SubGraph 骨架 + State 定义 | 三层 State、2 个 SubGraph、4 个 State Mapping、Parent Graph 组装 | `router.py` 未独立（路由在 graph.py + subgraph 中） |
+| 2 | Research SubGraph 节点 | 5 角色节点（合并为 research_nodes.py）、4 提示词、对抗式批判协议 | 节点文件合并，非每角色独立文件 |
+| 3 | Analysis SubGraph + Report | 3 角色节点（合并为 analysis_nodes.py）、4 提示词、Report Composer | 同上；8 个 Skills SKILL.md 未创建 |
+| 4 | 角色门控 + HITL + 流式 | RoleDefinition、PermissionGuard、HITL Gate、EventType 枚举、HITL API | `error_handler.py` 未独立（实现在 subgraph 中）；`middleware.py` 拆为 context.py + collaboration_middleware.py |
+| 5 | 配置 + 集成 | Pydantic 配置模型、config.example.yaml、CollaborationMiddleware 注册 | **Lead Agent 路由未实现**；Memory 系统未落地；Skills 未创建 |
+| 6 | E2E + 文档 | 11 个 E2E 测试、_extract_json 修复、route_after_critic 修复、hitl_gate 幂等修复 | — |
 
-**DoD**: Parent Graph 挂载两个 Mock SubGraph 可编译通过；State Mapping 纯函数单元测试通过
+### Phase 4: 生产就绪 (待实施)
 
-#### Sprint 2: Research SubGraph 节点 (Week 2)
+> Phase 3 完成了图结构、节点逻辑、权限门控、HITL、配置热加载和 E2E 测试。
+> 以下缺口阻止系统在真实环境中运行。按优先级排列。
 
-| 文件 | 说明 |
-|------|------|
-| `collaboration/nodes/pi_agent.py` | PI Agent (拆解任务 + Send API Fan-out + 汇总 + 审核裁决) |
-| `collaboration/nodes/data_scout.py` | Data Scout (多源采集 + 回应 Critic 质疑) |
-| `collaboration/nodes/critic_agent.py` | Critic Agent (结构化质疑 + Challenge JSON 生成) |
-| `collaboration/nodes/meta_judge.py` | Meta-Judge Agent (证据评估 + 独立裁决书) |
-| `collaboration/prompts/pi_agent.py` | PI 提示词 |
-| `collaboration/prompts/data_scout.py` | Scout 提示词 |
-| `collaboration/prompts/critic_agent.py` | Critic 提示词 |
-| `collaboration/prompts/meta_judge.py` | Meta-Judge 提示词 |
-| `collaboration/protocols/messages.py` | Challenge/Rebuttal/Ruling Pydantic 模型 |
-| `collaboration/protocols/debate.py` | 对抗式批判协议状态机 |
-| `tests/test_collaboration_nodes.py` | PI/Scout/Critic/Judge 节点单元测试 |
+#### P0: Lead Agent 路由到协作图
 
-**DoD**: Research SubGraph 内部 6 节点可走通完整流程（Mock 工具调用）；Critic 正确生成结构化 Challenge；Meta-Judge 正确生成裁决书
-
-#### Sprint 3: Analysis SubGraph + Report + Skills (Week 3)
-
-**目标**: Analysis SubGraph + Report Composer 可独立运行，首批 8 个 Skills 就绪
+**现状**: `agent.py:316-318` 注册了 CollaborationMiddleware，但 Lead Agent 本身仍是标准 ReAct。
+**需要**: 当 `collaboration.enabled: true` 时，Lead Agent 应调用 `build_collaboration_graph()` 而非标准 `make_lead_agent()`。或者在 `langgraph.json` 中注册协作图为独立 graph。
 
 | 文件 | 说明 |
 |------|------|
-| `collaboration/nodes/analyst_lead.py` | Analyst Lead (调度 Synthesis + 审核结果) |
-| `collaboration/nodes/synthesizer.py` | Synthesizer (多维对比 + SWOT + 趋势 + Skills 调用) |
-| `collaboration/nodes/internal_reviewer.py` | Internal Reviewer (分析质量审查) |
-| `collaboration/nodes/report_composer.py` | Report Composer (Markdown + matplotlib/plotly + swot-generator) |
-| `collaboration/prompts/analyst_lead.py` | Analyst Lead 提示词 |
-| `collaboration/prompts/synthesizer.py` | Synthesizer 提示词 |
-| `collaboration/prompts/internal_reviewer.py` | Internal Reviewer 提示词 |
-| `collaboration/prompts/report_composer.py` | Report Composer 提示词 |
-| `skills/public/spec-comparator/SKILL.md` | 规格对比矩阵 Skill |
-| `skills/public/data-normalizer/SKILL.md` | 数据标准化 Skill |
-| `skills/public/swot-generator/SKILL.md` | SWOT 生成 Skill |
-| `skills/public/price-elasticity/SKILL.md` | 价格弹性分析 Skill |
-| `skills/public/market-share-calc/SKILL.md` | 市场份额估算 Skill |
-| `skills/public/trend-detector/SKILL.md` | 趋势检测 Skill |
-| `skills/public/sentiment-analyzer/SKILL.md` | 情感分析 Skill |
-| `skills/public/source-credibility/SKILL.md` | 来源可信度评分 Skill |
-| `tests/test_collaboration_nodes.py` | Analysis 节点单元测试 (追加) |
-| `tests/test_collaboration_skills.py` | Skills 加载 + 工具过滤测试 |
+| `langgraph.json` | 注册协作图为独立 graph，或增加路由逻辑 |
+| `agents/lead_agent/agent.py` | 实现 `collaboration.enabled` 时的图切换逻辑 |
 
-**DoD**: Analysis SubGraph 可独立运行；Synthesizer 正确生成对比矩阵+SWOT+趋势+建议；Internal Reviewer 正确审查
+#### P1: Checkpointer 集成
 
-#### Sprint 4: 角色门控 + HITL + 流式 (Week 4)
+**现状**: `build_collaboration_graph()` 编译时未传 `checkpointer`。HITL 的 `interrupt()` 依赖 checkpoint 持久化才能暂停/恢复。
+**需要**: 编译时注入 `SqliteSaver`（开发）或 `PostgresSaver`（生产）。
 
 | 文件 | 说明 |
 |------|------|
-| `collaboration/permissions/role_definition.py` | RolePermission + ROLE_PERMISSIONS 字典 |
-| `collaboration/permissions/permission_guard.py` | PermissionGuardMiddleware (before_tool_call 检查) |
-| `collaboration/nodes/hitl_gate.py` | HITL Gate (interrupt + Stale State) |
-| `collaboration/nodes/error_handler.py` | 全局错误处理 (含 SubGraph error 字段上浮处理) |
-| `collaboration/events.py` | 流式事件定义 + emit 封装 |
-| `collaboration/middleware.py` | 协作上下文注入 + agent_role 标记 |
-| `app/gateway/routers/collaboration.py` | HITL 恢复 API |
-| `tests/test_collaboration_permissions.py` | 角色门控测试 (允许/拒绝/证据检查) |
-| `tests/test_collaboration_hitl.py` | HITL 全场景 |
-| `tests/test_collaboration_critic_judge.py` | Critic+Judge 对抗式批判集成测试 |
+| `collaboration/graph.py` | `builder.compile(checkpointer=...)` |
+| `config.yaml` | `collaboration.checkpointer.backend` 配置项 |
 
-**DoD**: 角色门控正确拒绝越权操作；HITL 暂停/恢复/幂等/过期全部通过；流式事件覆盖所有 phase
+#### P1: Send API 并行 Fan-out
 
-#### Sprint 5: 配置 + 集成 + Memory (Week 5)
+**现状**: `research_subgraph.py` import 了 `Send` 但未使用。Scout 采集是顺序的 `pi_agent → critic_agent → data_scout → critic_agent`。
+**需要**: PI 规划后通过 `Send(node, arg)` 并行启动 2-4 个 Scout，Scout 完成后通过 reducer 汇总结果。
 
 | 文件 | 说明 |
 |------|------|
-| `config/collaboration_config.py` | Pydantic 配置模型 (含 RoleGateConfig + MemoryConfig) |
-| `config.yaml` | 协作段配置落地 (含 role_gates + memory) |
-| `collaboration/memory/source_credibility.py` | 来源可信度档案 (基于 Critic/Meta-Judge 验证结果自动更新) |
-| `collaboration/memory/product_knowledge.py` | 产品知识库 (已验证数据点的持久化存储) |
-| `agents/lead_agent/agent.py` | 路由：检测 collaboration 请求 → 切换到协作图 |
-| `agents/middlewares/collaboration_middleware.py` | 协作上下文注入 + PermissionGuard 注册 + Memory 触发 |
+| `collaboration/subgraphs/research_subgraph.py` | 实现 `fan_out_to_scouts()` → `list[Send]` |
+| `collaboration/nodes/research_nodes.py` | PI 节点改为输出 task_plan 供 Send API 消费 |
 
-**DoD**: `config.yaml` 中 `collaboration.enabled: true` 后协作图可正常启动；热加载配置变更生效；Memory 正确记录来源可信度和产品知识
+#### P2: 真实 LLM 验证
 
-#### Sprint 6: E2E + 文档 (Week 6)
+**现状**: 所有 180 个测试使用 mock SubagentExecutor，未验证真实 LLM 调用下的 prompt 效果。
+**需要**: 至少 1 个集成测试用真实 LLM 跑通最小流程，验证 prompt 模板和 JSON 输出格式。
 
 | 文件 | 说明 |
 |------|------|
-| `tests/test_collaboration_e2e.py` | 3 个场景端到端测试 |
-| `tests/test_collaboration_debate.py` | 质疑-回应协议 E2E |
+| `tests/test_collaboration_live.py` | 真实 LLM 集成测试（需要 API key，手动运行） |
 
-**E2E 场景**:
-1. 竞品深度拆解 (完整 7 角色 + 对抗式批判 + HITL)
-2. 市场趋势洞察 (跳过验证, 快速路径)
-3. 商品定价优化 (Critic 发现矛盾 → 补采 → Judge 裁决 → PI 审核)
+#### P2: Skills 创建
 
-**DoD**:
-- [ ] 3 个 E2E 场景全部通过
-- [ ] `make test` 全量回归通过
-- [ ] CLAUDE.md 和 PA-Agent-DF-architecture.md 更新至最终状态
+**现状**: 8 个 Skill 名在代码中引用（`SubagentConfig.skills=[...]`），但 `skills/public/` 下无对应 `SKILL.md` 文件。
+**需要**: 为每个 Skill 创建 `SKILL.md`（YAML frontmatter + 指令）。
+
+| Skill | 文件 |
+|------|------|
+| `data-normalizer` | `skills/public/data-normalizer/SKILL.md` |
+| `sentiment-analyzer` | `skills/public/sentiment-analyzer/SKILL.md` |
+| `source-credibility` | `skills/public/source-credibility/SKILL.md` |
+| `spec-comparator` | `skills/public/spec-comparator/SKILL.md` |
+| `price-elasticity` | `skills/public/price-elasticity/SKILL.md` |
+| `market-share-calc` | `skills/public/market-share-calc/SKILL.md` |
+| `trend-detector` | `skills/public/trend-detector/SKILL.md` |
+| `swot-generator` | `skills/public/swot-generator/SKILL.md` |
+
+#### P3: 协作 Memory 落地
+
+**现状**: `collaboration_config.py` 定义了 `SourceCredibilityConfig` 和 `ProductKnowledgeConfig`，但未实际调用 DF Memory 系统。
+**需要**: 在 Critic/Meta-Judge 验证完成后触发 Memory 更新。
+
+| 文件 | 说明 |
+|------|------|
+| `collaboration/memory/source_credibility.py` | 基于验证结果更新数据源可信度评分 |
+| `collaboration/memory/product_knowledge.py` | 已验证数据点的持久化存储 |
 
 ---
 
@@ -2165,6 +2139,14 @@ collaboration:
 ---
 
 ## 附录 D: 文档修订记录
+
+### v2.1 (2026-05-15) — Phase 3 完成 + Phase 4 规划
+
+**修订内容**:
+- 更新 Phase 3 6 个 Sprint 完成状态（180 测试通过）
+- 记录计划与实际的差异（节点文件合并、Skills 未创建、Lead Agent 路由未实现等）
+- 新增 Phase 4 生产就绪计划（P0/P1/P2/P3 优先级）
+- 版本号更新至 v2.1
 
 ### v2.0 (2026-05-14) — Phase 1 修订版
 

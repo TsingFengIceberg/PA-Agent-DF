@@ -648,6 +648,84 @@ cd backend && make test
 
 ---
 
+## 9.7 Phase 4 计划: 生产就绪 (待实施)
+
+> Phase 3（6 个 Sprint）完成了图结构、节点逻辑、权限门控、HITL Gate、
+> 配置热加载、E2E 测试（180 个），全部用 mock SubagentExecutor。
+> 以下缺口阻止系统在真实 DF 环境中运行。
+
+### P0: Lead Agent 路由到协作图
+
+**现状**: `agent.py` 注册了 `CollaborationMiddleware`，但 Lead Agent 仍是标准 ReAct。
+**需要**: 在 `langgraph.json` 中注册协作图，或在 `make_lead_agent()` 中根据 `collaboration.enabled` 切换图。
+
+| 文件 | 说明 |
+|------|------|
+| `langgraph.json` | 注册协作图为独立 graph |
+| `agents/lead_agent/agent.py` | `collaboration.enabled` 时路由到 `build_collaboration_graph()` |
+
+### P1: Checkpointer 集成
+
+**现状**: `build_collaboration_graph()` 编译时未传 `checkpointer`。HITL 的 `interrupt()` 无持久化无法真正暂停/恢复。
+**需要**: `SqliteSaver`（开发）或 `PostgresSaver`（生产）。
+
+| 文件 | 说明 |
+|------|------|
+| `collaboration/graph.py` | `builder.compile(checkpointer=...)` |
+| `config.yaml` | `collaboration.checkpointer` 配置段 |
+
+### P1: Send API 并行 Fan-out
+
+**现状**: `research_subgraph.py` import 了 `Send` 但未使用，Scout 采集是顺序流。
+**需要**: PI 规划后 `Send(node, arg)` 并行启动 2-4 个 Scout，reducer 汇总结果。
+
+| 文件 | 说明 |
+|------|------|
+| `collaboration/subgraphs/research_subgraph.py` | 实现 `fan_out_to_scouts()` |
+| `collaboration/nodes/research_nodes.py` | PI 节点输出 task_plan 供 Send API 消费 |
+
+### P2: 真实 LLM 集成验证
+
+**现状**: 180 个测试全用 mock SubagentExecutor，prompt 模板未经真实 LLM 验证。
+**需要**: 至少 1 个集成测试用真实 LLM 跑通最小流程。
+
+| 文件 | 说明 |
+|------|------|
+| `tests/test_collaboration_live.py` | 真实 LLM 集成测试（需 API key，手动运行） |
+
+### P2: Skills SKILL.md 创建
+
+**现状**: 8 个 Skill 名在 `SubagentConfig.skills` 中引用，但 `skills/public/` 下无 `SKILL.md`。
+**需要**: 每个 Skill 创建 `SKILL.md`（YAML frontmatter + 指令）。
+
+| Skill | 文件 |
+|------|------|
+| `data-normalizer` | `skills/public/data-normalizer/SKILL.md` |
+| `sentiment-analyzer` | `skills/public/sentiment-analyzer/SKILL.md` |
+| `source-credibility` | `skills/public/source-credibility/SKILL.md` |
+| `spec-comparator` | `skills/public/spec-comparator/SKILL.md` |
+| `price-elasticity` | `skills/public/price-elasticity/SKILL.md` |
+| `market-share-calc` | `skills/public/market-share-calc/SKILL.md` |
+| `trend-detector` | `skills/public/trend-detector/SKILL.md` |
+| `swot-generator` | `skills/public/swot-generator/SKILL.md` |
+
+### P3: 协作 Memory 落地
+
+**现状**: `collaboration_config.py` 有 `SourceCredibilityConfig`/`ProductKnowledgeConfig`，未实际调用 DF Memory API。
+**需要**: Critic/Judge 验证后触发 Memory 更新。
+
+| 文件 | 说明 |
+|------|------|
+| `collaboration/memory/source_credibility.py` | 基于验证结果更新数据源评分 |
+| `collaboration/memory/product_knowledge.py` | 已验证数据点持久化 |
+
+### P3: router.py 独立
+
+**现状**: 路由逻辑分散在 `graph.py` (`route_after_research/analysis/hitl`) 和 subgraph 文件中。
+**如果需要**: 可抽取为独立 `collaboration/router.py` 集中管理。
+
+---
+
 ## 10. 业务场景与测试用例
 
 ### 10.1 场景 1: 竞品深度拆解 (Primary)
