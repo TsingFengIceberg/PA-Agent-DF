@@ -924,6 +924,107 @@ run_events:
   track_token_usage: true
 
 # ============================================================================
+# Collaboration System Configuration (PA-Agent-DF)
+# ============================================================================
+# Multi-agent collaborative analysis system — Research + Analysis + HITL + Report.
+# When enabled: true, the Lead Agent routes collaboration requests to the
+# Nested SubGraph architecture (Research SubGraph → Analysis SubGraph → HITL Gate).
+#
+# Hot-reload: changes to this section take effect without restart.
+
+# collaboration:
+#   enabled: false  # Set to true to enable the collaboration system
+#   default_workflow: "competitive_analysis"
+#
+#   # ── Role Configuration ──────────────────────────────────────────────
+#   roles:
+#     pi_agent:
+#       model: "claude-opus-4-7"
+#       thinking_enabled: true
+#       max_turns: 15
+#     data_scout:
+#       model: "inherit"
+#       thinking_enabled: false
+#       max_turns: 30
+#       max_instances: 4
+#       timeout_seconds: 600
+#     critic_agent:
+#       model: "claude-opus-4-7"
+#       thinking_enabled: true
+#       max_turns: 30
+#     meta_judge:
+#       model: "claude-opus-4-7"
+#       thinking_enabled: true
+#       max_turns: 25
+#     pi_review:
+#       model: "inherit"
+#       thinking_enabled: false
+#       max_turns: 15
+#     analyst_lead:
+#       model: "claude-opus-4-7"
+#       thinking_enabled: true
+#       max_turns: 15
+#     synthesizer:
+#       model: "claude-opus-4-7"
+#       thinking_enabled: true
+#       max_turns: 50
+#     internal_reviewer:
+#       model: "inherit"
+#       thinking_enabled: false
+#       max_turns: 15
+#     report_composer:
+#       model: "inherit"
+#       thinking_enabled: false
+#       max_turns: 40
+#     error_handler:
+#       max_turns: 5
+#
+#   # ── Skills (DF Skills System) ───────────────────────────────────────
+#   skills:
+#     enabled: true
+#     load_path: "skills/public"
+#
+#   # ── Memory (DF Memory Extension) ────────────────────────────────────
+#   memory:
+#     source_credibility:
+#       enabled: true
+#       update_trigger: "post_validation"
+#     product_knowledge:
+#       enabled: true
+#       update_trigger: "post_synthesis"
+#
+#   # ── HITL (Human-in-the-Loop Approval Gate) ──────────────────────────
+#   hitl:
+#     enabled: true
+#     gates:
+#       - post_synthesis
+#     stale_timeout_minutes: 30
+#     require_audit_log: true
+#
+#   # ── Workflow Presets ────────────────────────────────────────────────
+#   workflows:
+#     competitive_analysis:
+#       description: "Full competitive analysis with adversarial critique"
+#       scouts: 3
+#       phases: [planning, collecting, validating, synthesizing, reviewing, composing]
+#       skip_validation: false
+#     market_trend:
+#       description: "Market trend analysis (lightweight, skip validation)"
+#       scouts: 2
+#       phases: [planning, collecting, synthesizing, reviewing, composing]
+#       skip_validation: true
+#     pricing_optimization:
+#       description: "Pricing optimization analysis"
+#       scouts: 2
+#       phases: [planning, collecting, validating, synthesizing, reviewing, composing]
+#       skip_validation: false
+#     supply_chain_risk:
+#       description: "Supply chain risk assessment"
+#       scouts: 3
+#       phases: [planning, collecting, validating, synthesizing, reviewing, composing]
+#       skip_validation: false
+
+# ============================================================================
 # IM Channels Configuration
 # ============================================================================
 # Connect DeerFlow to external messaging platforms.

@@ -615,18 +615,18 @@ cd backend && make test
 
 **DoD**: 角色门控正确拒绝越权；HITL 暂停/恢复/幂等/过期通过
 
-### Sprint 5: 配置 + 集成 (Week 5)
+### Sprint 5: 配置 + 集成 (Week 5) — ✅ 完成
 
 **目标**: 配置热加载生效，Lead Agent 可路由到协作图
 
-| 文件 | 说明 |
-|------|------|
-| `config/collaboration_config.py` | Pydantic 配置模型 (含 RoleGateConfig) |
-| `config.yaml` | 协作段 + role_gates 配置 |
-| `agents/lead_agent/agent.py` | 路由：collaboration 请求 → 协作图 |
-| `agents/middlewares/collaboration_middleware.py` | PermissionGuard 注册 |
+| 文件 | 说明 | 状态 |
+|------|------|------|
+| `config/collaboration_config.py` | Pydantic 配置模型 (含 Roles/HITL/Workflows) | ✅ |
+| `config.yaml` | 协作段配置（10 角色 + Skills + Memory + HITL + 4 Workflows） | ✅ |
+| `agents/lead_agent/agent.py` | 路由：collaboration 请求 → 协作图 | ✅ |
+| `agents/middlewares/collaboration_middleware.py` | PermissionGuard 注册 | ✅ |
 
-**DoD**: config.yaml 热加载生效；collaboration.enabled: true 后协作图正常启动
+**DoD**: config.yaml 热加载生效；collaboration.enabled: true 后协作图正常启动 ✅
 
 ### Sprint 6: E2E + 文档 (Week 6) — ✅ 完成
 
