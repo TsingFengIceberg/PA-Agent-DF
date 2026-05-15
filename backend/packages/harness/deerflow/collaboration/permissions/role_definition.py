@@ -194,7 +194,9 @@ ROLES: dict[str, RoleDefinition] = {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 # 将抽象 Action 映射到 DeerFlow 具体工具名。
-# 这里使用工具名前缀匹配——例如 "web_search" 会匹配所有搜索类工具。
+# 规则：每个工具只出现在一个 Action 中（最通用的那个）。
+# 专用 Action（SYNTHESIZE, GENERATE_CHARTS 等）为认知型——空列表。
+# 它们对应 "用通用工具完成特定目的" 的场景，具体约束由 system prompt + DebateState 负责。
 ACTION_TOOL_MAP: dict[Action, list[str]] = {
     Action.PLAN_RESEARCH: [],
     Action.READ_DATA: ["read_file", "ls", "glob", "grep"],
@@ -202,16 +204,16 @@ ACTION_TOOL_MAP: dict[Action, list[str]] = {
     Action.FETCH_WEB: ["web_fetch", "tavily_fetch", "firecrawl_scrape", "jina_reader"],
     Action.PYTHON_COMPUTE: ["python", "bash"],
     Action.CHALLENGE: [],
-    Action.RESPOND_TO_CRITIC: ["web_search", "web_fetch", "firecrawl_search", "firecrawl_scrape"],
+    Action.RESPOND_TO_CRITIC: [],
     Action.ADJUDICATE: [],
-    Action.RUN_VERIFICATION: ["python", "bash"],
+    Action.RUN_VERIFICATION: [],
     Action.REVIEW_RULING: [],
     Action.OVERRIDE_RULING: [],
     Action.PLAN_ANALYSIS: [],
-    Action.SYNTHESIZE: ["python", "bash"],
-    Action.GENERATE_CHARTS: ["python", "bash", "write_file"],
-    Action.REVIEW_ANALYSIS: ["python", "bash", "read_file"],
-    Action.COMPOSE_REPORT: ["write_file", "bash"],
+    Action.SYNTHESIZE: [],
+    Action.GENERATE_CHARTS: [],
+    Action.REVIEW_ANALYSIS: [],
+    Action.COMPOSE_REPORT: [],
     Action.WRITE_OUTPUT: ["write_file", "present_files"],
 }
 

@@ -313,6 +313,12 @@ def _build_middlewares(
     if custom_middlewares:
         middlewares.extend(custom_middlewares)
 
+    # Inject CollaborationMiddleware when collaboration is enabled
+    if resolved_app_config.collaboration and resolved_app_config.collaboration.enabled:
+        from deerflow.agents.middlewares.collaboration_middleware import CollaborationMiddleware
+
+        middlewares.append(CollaborationMiddleware())
+
     # ClarificationMiddleware should always be last
     middlewares.append(ClarificationMiddleware())
     return middlewares

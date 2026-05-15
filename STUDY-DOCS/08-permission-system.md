@@ -225,3 +225,85 @@ from deerflow.runtime.user_context import get_current_agent_role  # type: ignore
 | `get_role`, `find_action_for_tool` | `deerflow.collaboration.permissions.role_definition` | **我们的代码** |
 
 这说明权限门控系统几乎不依赖 DeerFlow 的具体实现。`AgentMiddleware` 是 LangChain 的标准抽象，只要是 LangGraph agent 就能用。唯一的 DF 触点（`get_current_agent_role`）是"如何知道当前 agent 是什么角色"这一信息传递问题，而不是权限检查逻辑本身。
+
+---
+
+## Q9: `_get_current_role` 为什么有 contextvars + runtime.context 两层 fallback？ `📄 permission_guard.py` `📄 context.py`
+
+**A:** 两个路径，一个目标 — 拿到当前角色名才能做权限检查：
+
+```
+主路径（contextvars）          兜底路径（runtime.context）
+───────────────────          ──────────────────────────
+with current_role("pi"):     config = {"configurable":
+    executor.execute(task)      {"agent_role": "pi"}}
+    │                           │
+    └─ get_current_agent_role() └─ runtime.context.get("agent_role")
+       → 读 ContextVar             → 读 config 字典
+```
+
+**主路径**：`context.py` 的 `ContextVar`——节点函数里用 `with current_role("pi_agent")` 包裹 SubagentExecutor，整个 ReAct 循环内 context var 都是 `"pi_agent"`。
+
+**兜底路径**的存在原因：
+
+1. **还没人 set context var**：如果某个节点忘了用 `with current_role(...)`，主路径拿到空字符串，去 config 字典里碰。但如果两边都没设，两路都走不通——不是"碰运气"能猜中，而是给可能的集成路径留口子。
+
+2. **多线程边界**：`contextvars` 在 Python 标准线程中默认不传播。DF 的 SubagentExecutor 用双线程池，如果子代理在新线程中执行，context var 可能丢失。`runtime.context` 是跟着 `RunnableConfig` 走的 dict，跨线程不丢。
+
+3. **架构预留**：LangGraph 生态里把 `agent_role` 这类元数据挂 `config.context` 上是惯例。如果将来 DF 的 SubagentExecutor 升级后在 spawn 子代理时自动从 `SubagentConfig.name` 写入 `context["agent_role"]`，这条兜底路径自动生效，不需要改 guard 代码。
+
+坦白讲：当前这个 fallback 更像是"架构预留"而非"有效保障"。`get_current_agent_role()` 返回空字符串 → 两路都空 → 跳过权限检查（放行）。
+
+---
+
+## Q10: `context.py` 的实现用了 Python 什么机制？怎么用？ `📄 context.py`
+
+**A:** `contextvars.ContextVar`——Python 3.7+ 标准库，async 安全的"任务局部变量"。
+
+```python
+# context.py
+from contextvars import ContextVar
+
+_agent_role: ContextVar[str] = ContextVar("agent_role", default="")
+
+def get_current_agent_role() -> str:
+    return _agent_role.get()  # 读取当前任务的角色
+
+@contextmanager
+def current_role(role_name: str):
+    token = _agent_role.set(role_name)   # 设置
+    try:
+        yield
+    finally:
+        _agent_role.reset(token)         # 恢复旧值
+```
+
+**为什么需要 contextvars 而不是全局变量？**
+
+协作图里有多个角色并行运行（Send API fan-out 出 3 个 Scout），全局变量会被互相覆盖：
+
+```
+时间线：
+  Scout A: agent_role = "scout_A"    ← 全局变量被覆盖！
+  Scout B: agent_role = "scout_B"    ← 又覆盖！
+  Scout A 调 web_search → guard 读到 "scout_B" → 错！
+
+contextvars 下：
+  Scout A 的 task: agent_role = "scout_A"  ← 各自独立
+  Scout B 的 task: agent_role = "scout_B"  ← 互不干扰
+```
+
+**vs threading.local**：`threading.local` 只在多线程场景下隔离，`asyncio` 单线程多协程场景会串。`contextvars` 在 `asyncio.Task` 之间也是隔离的，适合 LangGraph 的 async 执行模型。
+
+**节点函数里的用法**：
+```python
+def critic_agent_node(state: ResearchSubGraphState) -> dict:
+    config = SubagentConfig(name="critic_agent", ...)
+    executor = SubagentExecutor(config, tools)
+
+    with current_role("critic_agent"):
+        result = executor.execute(task)
+    # 离开 with 块后 agent_role 自动恢复为空
+
+    return {"challenges": challenges}
+```

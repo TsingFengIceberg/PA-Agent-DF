@@ -13,10 +13,11 @@
 | 05 | 对抗式批判协议：Challenge/Rebuttal/Ruling | [`05-debate-protocol.md`](05-debate-protocol.md) | 2026-05-14 (3 Q&A) |
 | 06 | 执行实例走读：Research 全链路 | [`06-execution-walkthrough.md`](06-execution-walkthrough.md) | 2026-05-14 |
 | 07 | Analysis SubGraph：节点流转与分析 Prompt | [`07-analysis-subgraph.md`](07-analysis-subgraph.md) | 2026-05-14 (2 Q&A) |
-| 08 | 角色权限体系：Action 映射 + PermissionGuard | [`08-permission-system.md`](08-permission-system.md) | 2026-05-15 (8 Q&A) |
+| 08 | 角色权限体系：Action 映射 + PermissionGuard | [`08-permission-system.md`](08-permission-system.md) | 2026-05-15 (10 Q&A) |
 | 09 | HITL 审批门：interrupt() + Checkpoint 暂停/恢复 | [`09-hitl-gate.md`](09-hitl-gate.md) | 2026-05-15 (1 Q&A) |
 | 10 | 流式事件系统：EventType + SSE 推送链路 | [`10-events-streaming.md`](10-events-streaming.md) | 2026-05-15 (2 Q&A) |
 | 11 | 协作系统整体层级调用图 | [`11-architecture-hierarchy.md`](11-architecture-hierarchy.md) | 2026-05-15 (1 Q&A) |
+| 12 | Sprint 5 集成层：中间件注册 + 配置热加载 + HITL API | [`12-sprint5-integration.md`](12-sprint5-integration.md) | 2026-05-15 (3 Q&A) |
 
 ## 关联源文件索引
 
@@ -36,7 +37,13 @@
 | `collaboration/protocols/debate.py` | 05, 06 |
 | `collaboration/permissions/role_definition.py` | 08 |
 | `collaboration/permissions/permission_guard.py` | 08 |
+| `collaboration/context.py` | 08, 12 |
 | `collaboration/events.py` | 10 |
+| `config/collaboration_config.py` | 12 |
+| `agents/middlewares/collaboration_middleware.py` | 12 |
+| `agents/lead_agent/agent.py` | 12 |
+| `config/app_config.py` | 12 |
+| `app/gateway/routers/collaboration.py` | 09, 12 |
 | `agents/thread_state.py` | 01 |
 | `runtime/stream_bridge/base.py` | 10 |
 | `runtime/runs/worker.py` | 10 |
@@ -45,3 +52,5 @@
 | `tests/test_collaboration_debate.py` | 04 |
 | `tests/test_collaboration_nodes.py` | 02, 04 |
 | `tests/test_collaboration_analysis.py` | 04, 07 |
+| `tests/test_collaboration_permissions.py` | 04, 08 |
+| `tests/test_collaboration_hitl.py` | 04, 09 |

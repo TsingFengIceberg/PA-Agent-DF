@@ -58,16 +58,18 @@ class PermissionGuardMiddleware(AgentMiddleware):
         self._audit_log_path = audit_log_path
 
     def _get_current_role(self, runtime: Runtime) -> str | None:
-        """从 runtime 上下文提取当前角色名。
+        """从 contextvars 读取当前角色名。
 
-        SubagentConfig.name 在 DF 内部被设置为 agent_role context var。
+        Node 函数通过 context.current_role("pi_agent") 设置，
+        PermissionGuardMiddleware 在 before_tool_call 中读取。
         """
-        try:
-            from deerflow.runtime.user_context import get_current_agent_role  # type: ignore[attr-defined]
-            return get_current_agent_role()
-        except (ImportError, AttributeError):
-            pass
-        # Fallback: 从 config 中查找
+        from deerflow.collaboration.context import get_current_agent_role
+
+        role = get_current_agent_role()
+        if role:
+            return role
+
+        # Fallback: 从 runtime config 中查找
         context = getattr(runtime, "context", {}) or {}
         return context.get("agent_role")
 
