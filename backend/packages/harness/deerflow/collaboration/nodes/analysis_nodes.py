@@ -27,12 +27,26 @@ logger = logging.getLogger(__name__)
 
 def _extract_json(text: str) -> dict | list | None:
     """从 LLM 输出中提取 JSON 块。"""
+    # 1. 直接解析纯 JSON
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    # 2. 尝试 ```json ... ``` 代码块
     match = re.search(r"```json\s*([\s\S]*?)\s*```", text)
     if match:
         try:
             return json.loads(match.group(1))
         except json.JSONDecodeError:
             pass
+    # 3. 尝试裸 JSON 数组（必须在对象之前，因为数组含对象）
+    match = re.search(r"\[[\s\S]*\]", text)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+    # 4. 尝试裸 JSON 对象
     match = re.search(r"\{[\s\S]*\}", text)
     if match:
         try:

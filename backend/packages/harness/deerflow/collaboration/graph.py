@@ -50,8 +50,14 @@ logger = logging.getLogger(__name__)
 
 
 def error_handler_node(state: CollaborationState) -> dict:
-    """Parent 层错误处理 — 子图异常降级。Sprint 4 实现。"""
-    raise NotImplementedError("error_handler_node — Sprint 4 实现")
+    """Parent 层错误处理 — 子图异常降级。
+
+    读取 collaboration_error 字段，记录错误并终止图运行。
+    此节点后连接 END，节点异常不冒泡到父图。
+    """
+    error_msg = state.get("collaboration_error", "Unknown error")
+    logger.error("Collaboration error handler triggered: %s", error_msg)
+    return {}  # 错误已记录，终止图运行
 
 
 # ── 条件路由 ─────────────────────────────────────────────────────────────────

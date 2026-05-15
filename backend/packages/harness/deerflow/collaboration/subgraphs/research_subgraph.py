@@ -47,14 +47,21 @@ logger = logging.getLogger(__name__)
 def route_after_critic(state: ResearchSubGraphState) -> Literal["data_scout", "meta_judge"]:
     """Critic 之后的路径选择。
 
-    返回 "data_scout" 触发定向补采（最多 2 轮），
-    返回 "meta_judge" 进入裁决阶段。
+    只检查本轮新产生的 pending challenges（未被 rebuttals 覆盖的），
+    避免因 add reducer 累加导致旧 challenges 反复触发循环。
     """
     debate_round = state.get("debate_round", 0) or 0
     challenges = state.get("challenges", [])
+    rebuttals = state.get("rebuttals", [])
 
-    # 有质疑且未满最大轮次 → 补采
-    if challenges and debate_round < 2:
+    if not challenges:
+        return "meta_judge"
+
+    # 只有未被 rebuttal 覆盖的 challenge 才需要补采
+    rebutted_ids = {r.get("challenge_id") for r in rebuttals if isinstance(r, dict)}
+    pending = [c for c in challenges if isinstance(c, dict) and c.get("challenge_id") not in rebutted_ids]
+
+    if pending and debate_round < 2:
         return "data_scout"
     return "meta_judge"
 

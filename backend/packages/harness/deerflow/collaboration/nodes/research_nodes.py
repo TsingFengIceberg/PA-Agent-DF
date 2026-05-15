@@ -29,14 +29,26 @@ logger = logging.getLogger(__name__)
 
 def _extract_json(text: str, key: str | None = None) -> dict | list | None:
     """从 LLM 输出中提取 JSON 块。"""
-    # 尝试 ```json ... ``` 代码块
+    # 1. 直接解析纯 JSON
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+    # 2. 尝试 ```json ... ``` 代码块
     match = re.search(r"```json\s*([\s\S]*?)\s*```", text)
     if match:
         try:
             return json.loads(match.group(1))
         except json.JSONDecodeError:
             pass
-    # 尝试裸 JSON 对象
+    # 3. 尝试裸 JSON 数组（必须在对象之前，因为数组含对象）
+    match = re.search(r"\[[\s\S]*\]", text)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except json.JSONDecodeError:
+            pass
+    # 4. 尝试裸 JSON 对象
     match = re.search(r"\{[\s\S]*\}", text)
     if match:
         try:
@@ -230,17 +242,25 @@ def critic_agent_node(state: ResearchSubGraphState) -> dict:
         debate_round = state.get("debate_round", 0) or 0
 
         if not scout_results:
-            return {"challenges": []}  # 无数据可审查
-
-        instruction = (
-            f"You are reviewing {len(scout_results)} scout results (debate round {debate_round + 1}).\n"
-            f"Review each data point for: source conflicts, methodological gaps, timeliness, "
-            f"statistical outliers.\n\n"
-            f"Output a JSON list of challenges. Each challenge must have: "
-            f"challenge_id, claim, evidence (list), severity (critical/major/minor), "
-            f"suggested_remedy, target_scout_index (optional).\n"
-            f"If no issues found, output an empty list []."
-        )
+            # 首次进入（PI 规划后，尚无数据）：Critic 评审研究计划
+            instruction = (
+                "No scout data collected yet. Review the research plan for adequacy. "
+                "Output a JSON list of challenges about what data to collect or verify. "
+                "Keep challenges focused on data gaps, source selection, and methodology. "
+                "If the plan is sufficient, output an empty list [].\n\n"
+                "Each challenge must have: challenge_id, claim, evidence (list), "
+                "severity (critical/major/minor), suggested_remedy, target_scout_index (optional)."
+            )
+        else:
+            instruction = (
+                f"You are reviewing {len(scout_results)} scout results (debate round {debate_round + 1}).\n"
+                f"Review each data point for: source conflicts, methodological gaps, timeliness, "
+                f"statistical outliers.\n\n"
+                f"Output a JSON list of challenges. Each challenge must have: "
+                f"challenge_id, claim, evidence (list), severity (critical/major/minor), "
+                f"suggested_remedy, target_scout_index (optional).\n"
+                f"If no issues found, output an empty list []."
+            )
         task = _build_task_description(state, "Critic Agent", instruction)
         executor = SubagentExecutor(config, tools)
         result = executor.execute(task)
@@ -255,7 +275,7 @@ def critic_agent_node(state: ResearchSubGraphState) -> dict:
 
         # 推进辩论状态
         if challenges:
-            debate_state.advance_to_critique([])  # 先推进轮次
+            debate_state.advance_to_critique([])
     except Exception as e:
         logger.exception("critic_agent_node failed")
         return {"error": f"Critic Agent: {e}"}

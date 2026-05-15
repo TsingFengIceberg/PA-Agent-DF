@@ -91,9 +91,11 @@ def hitl_gate_node(state: CollaborationState) -> dict | Command:
 
     幂等性检查：如果 state 已有 review_decision，直接返回（可能是 resume 后再次命中）。
     """
-    # 幂等性：如果已经做出决定，不重复暂停
+    # 幂等性：如果已做出 terminal 决策（approve），跳过 interrupt 防止重复处理
+    # modify/replan 触发子图重跑后会重新进入此节点，需重新审批——不清除旧值，
+    # 新的 interrupt 结果会直接覆盖 review_decision
     existing_decision = state.get("review_decision")
-    if existing_decision:
+    if existing_decision and existing_decision not in ("modify", "replan"):
         logger.info("HITL: 已有审批决定 '%s'，跳过 interrupt", existing_decision)
         return {}
 

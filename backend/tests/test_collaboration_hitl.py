@@ -162,18 +162,25 @@ class TestHitlGateNode:
         assert result == {}
 
     def test_idempotent_existing_modify_decision(self):
+        """已有 modify 决策 → 循环后重入，清除旧决策并重新 interrupt。
+
+        modify/replan 触发子图重跑后会再次进入 HITL，此时应重新审批而非跳过。
+        """
         from deerflow.collaboration.nodes.hitl_gate import hitl_gate_node
 
         state = _make_state(review_decision="modify")
-        result = hitl_gate_node(state)
-        assert result == {}
+        with patch("deerflow.collaboration.nodes.hitl_gate.interrupt", return_value="approve"):
+            result = hitl_gate_node(state)
+        assert result == {"review_decision": "approve"}
 
     def test_idempotent_existing_replan_decision(self):
+        """已有 replan 决策 → 循环后重入，清除旧决策并重新 interrupt。"""
         from deerflow.collaboration.nodes.hitl_gate import hitl_gate_node
 
         state = _make_state(review_decision="replan")
-        result = hitl_gate_node(state)
-        assert result == {}
+        with patch("deerflow.collaboration.nodes.hitl_gate.interrupt", return_value="approve"):
+            result = hitl_gate_node(state)
+        assert result == {"review_decision": "approve"}
 
     def test_interrupt_called_with_approval_payload(self):
         """无 review_decision → 调用 interrupt() → 返回决定。"""
