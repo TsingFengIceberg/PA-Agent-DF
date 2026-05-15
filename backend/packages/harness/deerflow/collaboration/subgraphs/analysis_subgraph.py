@@ -18,6 +18,11 @@ from typing import TYPE_CHECKING, Literal
 from langgraph.constants import END
 from langgraph.graph import StateGraph
 
+from deerflow.collaboration.nodes.analysis_nodes import (
+    analyst_lead_node,
+    internal_reviewer_node,
+    synthesizer_node,
+)
 from deerflow.collaboration.state import AnalysisSubGraphState
 
 if TYPE_CHECKING:
@@ -25,46 +30,18 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ── 节点声明（Sprint 3 实现具体逻辑）──────────────────────────────────────────
-
-
-def analyst_lead_node(state: AnalysisSubGraphState) -> dict:
-    """Analyst Lead — 调度分析流程。
-
-    基于 validated_brief 确定分析维度、调用对应 Skills。
-    Sprint 3 实现：结构化分析计划生成。
-    """
-    raise NotImplementedError("analyst_lead_node — Sprint 3 实现")
-
-
-def synthesizer_node(state: AnalysisSubGraphState) -> dict:
-    """Synthesizer — 多维对比 + SWOT + 趋势 + 建议。
-
-    使用 Skills: spec-comparator, price-elasticity, market-share-calc, trend-detector。
-    生成 comparison_matrix, swot_analysis, trend_analysis, recommendations。
-    """
-    raise NotImplementedError("synthesizer_node — Sprint 3 实现")
-
-
-def internal_reviewer_node(state: AnalysisSubGraphState) -> dict:
-    """Internal Reviewer — 分析质量内审。
-
-    检查：数据引用准确性、逻辑一致性、可视化完整性。
-    """
-    raise NotImplementedError("internal_reviewer_node — Sprint 3 实现")
-
-
-def error_handler_node(state: AnalysisSubGraphState) -> dict:
-    """错误处理 — 子图异常上浮。"""
-    raise NotImplementedError("error_handler_node — Sprint 3 实现")
-
 
 # ── 条件路由 ─────────────────────────────────────────────────────────────────
 
 
 def route_after_reviewer(state: AnalysisSubGraphState) -> Literal["__end__", "error_handler"]:
-    """Internal Reviewer 后的路径选择。"""
+    """Internal Reviewer 后的路径选择。
+
+    审查未通过或发生异常时跳到错误处理。
+    """
     if state.get("error"):
+        return "error_handler"
+    if state.get("internal_review_passed") is False:
         return "error_handler"
     return "__end__"
 
@@ -94,3 +71,10 @@ def build_analysis_subgraph() -> CompiledStateGraph:
     builder.add_edge("error_handler", END)
 
     return builder.compile()
+
+
+def error_handler_node(state: AnalysisSubGraphState) -> dict:
+    """错误处理 — 子图异常上浮。"""
+    error_msg = state.get("error", "Unknown error in Analysis SubGraph")
+    logger.error("Analysis SubGraph error: %s", error_msg)
+    return {}

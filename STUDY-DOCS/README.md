@@ -12,7 +12,8 @@
 | 04 | 测试模式与断言 | [`04-testing-patterns.md`](04-testing-patterns.md) | 2026-05-14 (3 Q&A) |
 | 05 | 角色体系与权限门控 | *(待编码)* | — |
 | 06 | 对抗式批判协议 | [`05-debate-protocol.md`](05-debate-protocol.md) | 2026-05-14 (3 Q&A) |
-| 07 | 执行实例走读：Research SubGraph 全链路 | [`06-execution-walkthrough.md`](06-execution-walkthrough.md) | 2026-05-14 |
+| 07 | 执行实例走读：Research 全链路 | [`06-execution-walkthrough.md`](06-execution-walkthrough.md) | 2026-05-14 |
+| 08 | Analysis SubGraph：节点流转与分析 Prompt | [`07-analysis-subgraph.md`](07-analysis-subgraph.md) | 2026-05-14 (2 Q&A) |
 | 07 | HITL 人类审批门 | *(待编码)* | — |
 | 08 | 配置与集成 | *(待编码)* | — |
 
@@ -34,3 +35,5 @@
 | `backend/packages/harness/deerflow/collaboration/protocols/debate.py` | 05, 06 |
 | `backend/packages/harness/deerflow/collaboration/prompts/research_prompts.py` | 05, 06 |
 | `backend/packages/harness/deerflow/collaboration/nodes/research_nodes.py` | 02, 06 |
+| `backend/packages/harness/deerflow/collaboration/nodes/analysis_nodes.py` | 07 |
+| `backend/packages/harness/deerflow/collaboration/prompts/analysis_prompts.py` | 07 |

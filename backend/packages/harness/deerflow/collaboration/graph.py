@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING, Literal
 from langgraph.constants import END
 from langgraph.graph import StateGraph
 
+from deerflow.collaboration.nodes.analysis_nodes import report_composer_node
 from deerflow.collaboration.state import CollaborationState
 from deerflow.collaboration.subgraphs.analysis_subgraph import build_analysis_subgraph
 from deerflow.collaboration.subgraphs.research_subgraph import build_research_subgraph
@@ -44,7 +45,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# ── Parent 层节点 ────────────────────────────────────────────────────────────
+# ── Parent 层节点 ──
 
 
 def hitl_gate_node(state: CollaborationState) -> dict:
@@ -58,17 +59,8 @@ def hitl_gate_node(state: CollaborationState) -> dict:
     raise NotImplementedError("hitl_gate_node — Sprint 4 实现")
 
 
-def report_composer_node(state: CollaborationState) -> dict:
-    """Report Composer — 最终报告生成。
-
-    基于 synthesis_report 生成 Markdown 格式的完整分析报告，
-    包含图表、对比表、SWOT 矩阵、趋势分析和建议。
-    """
-    raise NotImplementedError("report_composer_node — Sprint 3 实现")
-
-
 def error_handler_node(state: CollaborationState) -> dict:
-    """Parent 层错误处理 — 子图异常降级。"""
+    """Parent 层错误处理 — 子图异常降级。Sprint 4 实现。"""
     raise NotImplementedError("error_handler_node — Sprint 4 实现")
 
 
