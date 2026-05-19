@@ -11,6 +11,8 @@ import logging
 import re
 from typing import TYPE_CHECKING
 
+from langgraph.types import Command, Send
+
 from deerflow.collaboration.protocols.debate import MAX_DEBATE_ROUNDS, DebateState, create_debate_state
 from deerflow.collaboration.protocols.messages import Challenge, Rebuttal, Ruling, Severity
 from deerflow.collaboration.prompts import (
@@ -135,6 +137,34 @@ def pi_agent_node(state: ResearchSubGraphState) -> dict:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# PI Dispatch — Send API Fan-out 到 Data Scouts
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def pi_dispatch_node(state: ResearchSubGraphState) -> Command | dict:
+    """PI Dispatch — 读取 research_plan，通过 Send API 并行分发 Scout 任务。
+
+    LangGraph Send API 语义：
+    - Command(goto=[Send(...)]) 将多个 Send 目标并行调度
+    - 每个 Send payload 合并到目标节点的 state 副本中
+    - 所有目标完成后，图沿 pi_dispatch → critic_agent 继续
+    """
+    plan = state.get("research_plan", {})
+    if not isinstance(plan, dict):
+        logger.warning("pi_dispatch_node: research_plan is not a dict, skipping fan-out")
+        return {}
+
+    sub_tasks = plan.get("sub_tasks", [])
+    if not sub_tasks:
+        logger.warning("pi_dispatch_node: no sub_tasks in research_plan, skipping fan-out")
+        return {}
+
+    sends = [Send("data_scout", {"scout_task": t}) for t in sub_tasks]
+    logger.info("pi_dispatch_node: dispatching %d scouts", len(sends))
+    return Command(goto=sends)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # Data Scout — 并行采集 + 回应 Critic
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -190,14 +220,24 @@ def data_scout_node(state: ResearchSubGraphState) -> dict:
                 "scout_results": [rebuttal_data.get("new_data")] if rebuttal_data.get("new_data") else [],
             }
         else:
-            # 首次采集模式
-            plan = state.get("research_plan", {})
-            instruction = (
-                f"Research Plan: {json.dumps(plan, ensure_ascii=False)}\n\n"
-                f"Execute your assigned sub-task. Collect data and output as JSON with keys: "
-                f"'source', 'content', 'data_points' (list of {{label, value, confidence}}), "
-                f"'methods' (list of tool names used)."
-            )
+            # 首次采集模式 — 优先使用 Send API 传入的 scout_task
+            scout_task = state.get("scout_task")
+            if scout_task:
+                instruction = (
+                    f"Assigned Task: {json.dumps(scout_task, ensure_ascii=False)}\n\n"
+                    f"Execute this specific sub-task. Collect data from the specified target sources "
+                    f"using the recommended methods. Output as JSON with keys: "
+                    f"'source', 'content', 'data_points' (list of {{label, value, confidence}}), "
+                    f"'methods' (list of tool names used), 'task_id'."
+                )
+            else:
+                plan = state.get("research_plan", {})
+                instruction = (
+                    f"Research Plan: {json.dumps(plan, ensure_ascii=False)}\n\n"
+                    f"Execute your assigned sub-task. Collect data and output as JSON with keys: "
+                    f"'source', 'content', 'data_points' (list of {{label, value, confidence}}), "
+                    f"'methods' (list of tool names used)."
+                )
             task = _build_task_description(state, "Data Scout (Collection Mode)", instruction)
             executor = SubagentExecutor(config, tools)
             result = executor.execute(task)
@@ -280,9 +320,22 @@ def critic_agent_node(state: ResearchSubGraphState) -> dict:
         logger.exception("critic_agent_node failed")
         return {"error": f"Critic Agent: {e}"}
 
+    # Memory: 记录质疑涉及的来源
+    src_mem_update: dict = {}
+    if challenges:
+        try:
+            from deerflow.collaboration.memory import SourceCredibilityMemory
+
+            src_mem = SourceCredibilityMemory.from_state(state.get("source_credibility_memory"))
+            src_mem.apply_challenges(challenges)
+            src_mem_update = {"source_credibility_memory": src_mem.to_dict()}
+        except Exception as e:
+            logger.debug("SourceCredibilityMemory update skipped: %s", e)
+
     return {
         "challenges": challenges,
         "debate_round": debate_state.current_round,
+        **src_mem_update,
     }
 
 
@@ -336,6 +389,17 @@ def meta_judge_node(state: ResearchSubGraphState) -> dict:
         logger.exception("meta_judge_node failed")
         return {"error": f"Meta-Judge: {e}"}
 
+    # Memory: 根据裁决更新来源可信度分数
+    src_mem_update: dict = {}
+    try:
+        from deerflow.collaboration.memory import SourceCredibilityMemory
+
+        src_mem = SourceCredibilityMemory.from_state(state.get("source_credibility_memory"))
+        src_mem.apply_ruling(ruling_data, state.get("scout_results", []))
+        src_mem_update = {"source_credibility_memory": src_mem.to_dict()}
+    except Exception as e:
+        logger.debug("SourceCredibilityMemory update skipped: %s", e)
+
     return {
         "ruling": {
             "ruling_id": ruling.ruling_id,
@@ -346,6 +410,7 @@ def meta_judge_node(state: ResearchSubGraphState) -> dict:
             "computation_summary": ruling.computation_summary,
         },
         "research_quality_score": ruling.quality_score,
+        **src_mem_update,
     }
 
 
@@ -393,7 +458,22 @@ def pi_review_node(state: ResearchSubGraphState) -> dict:
         logger.exception("pi_review_node failed")
         return {"error": f"PI Review: {e}"}
 
-    state_update: dict = {"validated_brief": validated_brief}
+    # Memory: 将验证过的数据点存入产品知识库
+    prod_mem_update: dict = {}
+    if validated_brief:
+        try:
+            from deerflow.collaboration.memory import ProductKnowledgeMemory
+
+            prod_mem = ProductKnowledgeMemory.from_state(state.get("product_knowledge_memory"))
+            prod_mem.ingest_brief(validated_brief, state.get("research_quality_score", 0.5))
+            prod_mem_update = {"product_knowledge_memory": prod_mem.to_dict()}
+        except Exception as e:
+            logger.debug("ProductKnowledgeMemory update skipped: %s", e)
+
+    state_update: dict = {
+        "validated_brief": validated_brief,
+        **prod_mem_update,
+    }
     if override_log:
         state_update["pi_override_log"] = [override_log]
     return state_update

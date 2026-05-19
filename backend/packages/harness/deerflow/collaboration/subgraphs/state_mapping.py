@@ -48,6 +48,15 @@ def map_research_to_parent(
     if error is not None:
         result["collaboration_error"] = error
 
+    # Memory：子图更新后的 credibility/product knowledge 写回父图
+    src_mem = child_state.get("source_credibility_memory")
+    if src_mem is not None:
+        result["source_credibility_memory"] = src_mem
+
+    prod_mem = child_state.get("product_knowledge_memory")
+    if prod_mem is not None:
+        result["product_knowledge_memory"] = prod_mem
+
     return result
 
 
@@ -70,6 +79,15 @@ def map_parent_to_research(parent_state: CollaborationState) -> dict:
     max_scouts = parent_state.get("max_scouts")
     if max_scouts is not None:
         result["max_scouts"] = max_scouts  # type: ignore[typeddict-unknown-key]
+
+    # Memory：将跨 run 记忆传入 Research SubGraph
+    src_mem = parent_state.get("source_credibility_memory")
+    if src_mem is not None:
+        result["source_credibility_memory"] = src_mem  # type: ignore[typeddict-unknown-key]
+
+    prod_mem = parent_state.get("product_knowledge_memory")
+    if prod_mem is not None:
+        result["product_knowledge_memory"] = prod_mem  # type: ignore[typeddict-unknown-key]
 
     return result
 

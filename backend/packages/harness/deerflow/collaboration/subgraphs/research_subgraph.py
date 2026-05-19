@@ -23,7 +23,6 @@ from typing import TYPE_CHECKING, Literal
 
 from langgraph.constants import END
 from langgraph.graph import StateGraph
-from langgraph.types import Send
 
 from deerflow.collaboration.nodes.research_nodes import (
     critic_agent_node,
@@ -31,6 +30,7 @@ from deerflow.collaboration.nodes.research_nodes import (
     error_handler_node,
     meta_judge_node,
     pi_agent_node,
+    pi_dispatch_node,
     pi_review_node,
 )
 from deerflow.collaboration.state import ResearchSubGraphState
@@ -87,6 +87,7 @@ def build_research_subgraph() -> CompiledStateGraph:
 
     # 节点注册 — 导入自 deerflow.collaboration.nodes
     builder.add_node("pi_agent", pi_agent_node)
+    builder.add_node("pi_dispatch", pi_dispatch_node)
     builder.add_node("data_scout", data_scout_node)
     builder.add_node("critic_agent", critic_agent_node)
     builder.add_node("meta_judge", meta_judge_node)
@@ -95,7 +96,8 @@ def build_research_subgraph() -> CompiledStateGraph:
 
     # 边
     builder.set_entry_point("pi_agent")
-    builder.add_edge("pi_agent", "critic_agent")
+    builder.add_edge("pi_agent", "pi_dispatch")
+    builder.add_edge("pi_dispatch", "critic_agent")
     builder.add_conditional_edges("critic_agent", route_after_critic, {
         "data_scout": "data_scout",
         "meta_judge": "meta_judge",

@@ -65,6 +65,12 @@ class CollaborationState(AgentState):
     collaboration_error: NotRequired[str | None]
     """子图异常通过 state_out 映射到此字段，父图条件边降级处理。"""
 
+    # ── 协作 Memory（跨 run 持久化，通过 checkpointer）──
+    source_credibility_memory: NotRequired[dict | None]
+    """Source credibility scores accumulated across research runs."""
+    product_knowledge_memory: NotRequired[dict | None]
+    """Validated product data points accumulated across research runs."""
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Research SubGraph State（独立 namespace）
@@ -93,6 +99,8 @@ class ResearchSubGraphState(AgentState):
     # ── Scout 采集结果（Send API Fan-out 并行，累加合并）──
     scout_results: Annotated[list[dict], op_add]
     """Data Scout 返回的结构化采集结果，每项含 source/content/data_points/timestamp。"""
+    scout_task: NotRequired[dict | None]
+    """Send API 传入的单个采集任务 {id, query, target_sources, method}。"""
 
     # ── 对抗式批判（ClawdLab 核心协议）──
     challenges: Annotated[list[dict], op_add]
@@ -112,6 +120,12 @@ class ResearchSubGraphState(AgentState):
     validated_brief: NotRequired[dict | None]
     """精炼后的研究简报，传递给 Analysis SubGraph。"""
     research_quality_score: NotRequired[float | None]
+
+    # ── 协作 Memory（父图传入的跨 run 记忆）──
+    source_credibility_memory: NotRequired[dict | None]
+    """Source credibility scores passed from parent state (read-only input)."""
+    product_knowledge_memory: NotRequired[dict | None]
+    """Product knowledge passed from parent state (read-only input)."""
 
     # ── 异常 ──
     error: NotRequired[str | None]

@@ -25,6 +25,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Literal
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.constants import END
 from langgraph.graph import StateGraph
 
@@ -41,6 +42,7 @@ from deerflow.collaboration.subgraphs.state_mapping import (
 )
 
 if TYPE_CHECKING:
+    from langgraph.checkpoint.base import Checkpointer
     from langgraph.graph import CompiledStateGraph
 
 logger = logging.getLogger(__name__)
@@ -103,7 +105,7 @@ def route_after_hitl(state: CollaborationState) -> Literal["report_composer", "r
 # ── Parent Graph 构建 ────────────────────────────────────────────────────────
 
 
-def build_collaboration_graph() -> CompiledStateGraph:
+def build_collaboration_graph(checkpointer: "Checkpointer | None" = None) -> CompiledStateGraph:
     """构建 Parent Graph (Nested SubGraph 架构)。
 
     LangGraph Nested SubGraph 关键 API：
@@ -114,7 +116,12 @@ def build_collaboration_graph() -> CompiledStateGraph:
     - 父子图共享 checkpointer 实例
     - 每 SubGraph 使用独立 checkpoint_ns 防止并行碰撞
 
-    返回编译后的协作图，由 make_lead_agent() 或 langgraph.json 加载。
+    Args:
+        checkpointer: LangGraph Checkpointer (SqliteSaver / PostgresSaver / InMemorySaver)。
+                      由 DeerFlow Worker 在运行时注入或通过 make_collaboration_agent(config) 传入。
+                      传入后 HITL interrupt() 具备持久化能力。
+
+    返回编译后的协作图。
     """
     builder = StateGraph(CollaborationState)
 
@@ -179,4 +186,18 @@ def build_collaboration_graph() -> CompiledStateGraph:
     builder.add_edge("report_composer", END)
     builder.add_edge("error_handler", END)
 
-    return builder.compile()
+    return builder.compile(checkpointer=checkpointer)
+
+
+def make_collaboration_agent(config: "RunnableConfig") -> "CompiledStateGraph":
+    """LangGraph 工厂函数，供 langgraph.json 的 graphs 注册。
+
+    签名与 make_lead_agent(config) 兼容，由 LangGraph Runtime 传入
+    RunnableConfig（含 configurable.thread_id, assistant_id 等）。
+
+    checkpointer 由 DeerFlow Worker 在运行时注入 (agent.checkpointer = ...)，
+    或通过 config.configurable 传入（用于测试和独立运行）。
+    """
+    # Runtime 传入的 checkpointer（可选）
+    checkpointer = config.get("configurable", {}).get("checkpointer") if config else None
+    return build_collaboration_graph(checkpointer=checkpointer)

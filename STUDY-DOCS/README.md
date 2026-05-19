@@ -18,27 +18,36 @@
 | 10 | 流式事件系统：EventType + SSE 推送链路 | [`10-events-streaming.md`](10-events-streaming.md) | 2026-05-15 (2 Q&A) |
 | 11 | 协作系统整体层级调用图 | [`11-architecture-hierarchy.md`](11-architecture-hierarchy.md) | 2026-05-15 (1 Q&A) |
 | 12 | Sprint 5 集成层：中间件注册 + 配置热加载 + HITL API | [`12-sprint5-integration.md`](12-sprint5-integration.md) | 2026-05-15 (3 Q&A) |
+| 13 | 协作记忆系统：来源可信度 + 产品知识库双轨记忆 | [`13-memory-system.md`](13-memory-system.md) | 2026-05-19 (5 Q&A) |
+| 14 | Phase 4 P0/P1 Review: 生产就绪关键修补 | [`14-phase4-p0-p1-review.md`](14-phase4-p0-p1-review.md) | 2026-05-19 (6 Q&A) |
 
 ## 关联源文件索引
 
 | 源文件 | 相关学习文档 |
 |--------|-------------|
-| `collaboration/state.py` | 01, 11 |
-| `collaboration/subgraphs/state_mapping.py` | 01, 11 |
-| `collaboration/subgraphs/research_subgraph.py` | 02, 05, 11 |
+| `collaboration/state.py` | 01, 11, 13 |
+| `collaboration/subgraphs/state_mapping.py` | 01, 11, 13 |
+| `collaboration/subgraphs/research_subgraph.py` | 02, 05, 11, 14 |
 | `collaboration/subgraphs/analysis_subgraph.py` | 02, 07, 11 |
-| `collaboration/graph.py` | 03, 11 |
-| `collaboration/nodes/research_nodes.py` | 02, 06 |
+| `collaboration/graph.py` | 03, 11, 14 |
+| `collaboration/nodes/research_nodes.py` | 02, 06, 13, 14 |
 | `collaboration/nodes/analysis_nodes.py` | 07 |
 | `collaboration/nodes/hitl_gate.py` | 09 |
 | `collaboration/prompts/research_prompts.py` | 05, 06 |
 | `collaboration/prompts/analysis_prompts.py` | 07 |
 | `collaboration/protocols/messages.py` | 05, 06 |
 | `collaboration/protocols/debate.py` | 05, 06 |
+| `collaboration/memory/__init__.py` | 13 |
+| `collaboration/memory/source_credibility.py` | 13 |
+| `collaboration/memory/product_knowledge.py` | 13 |
 | `collaboration/permissions/role_definition.py` | 08 |
 | `collaboration/permissions/permission_guard.py` | 08 |
 | `collaboration/context.py` | 08, 12 |
 | `collaboration/events.py` | 10 |
+| `collaboration/memory/__init__.py` | 13 |
+| `collaboration/memory/source_credibility.py` | 13 |
+| `collaboration/memory/product_knowledge.py` | 13 |
+| `collaboration/nodes/research_nodes.py` | 02, 06, 14 |
 | `config/collaboration_config.py` | 12 |
 | `agents/middlewares/collaboration_middleware.py` | 12 |
 | `agents/lead_agent/agent.py` | 12 |
@@ -54,3 +63,5 @@
 | `tests/test_collaboration_analysis.py` | 04, 07 |
 | `tests/test_collaboration_permissions.py` | 04, 08 |
 | `tests/test_collaboration_hitl.py` | 04, 09 |
+| `tests/test_collaboration_memory.py` | 13 |
+| `langgraph.json` | 14 |
